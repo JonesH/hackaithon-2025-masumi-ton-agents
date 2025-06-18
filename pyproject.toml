@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["mypy", "ruff"]
+dev = ["mypy", "ruff", "ipykernel"]
 
 [build-system]
 requires = ["setuptools"]
