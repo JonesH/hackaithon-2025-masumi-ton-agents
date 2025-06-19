@@ -84,20 +84,47 @@ class OrchestratorAgentWrapper(Agent):
             if self.debug_mode:
                 print(f"Orchestrator team initialization warning: {e}")
 
-    async def arun(self, message: str, stream: bool = False) -> Any:
+    async def arun(
+        self,
+        message: str | list | dict | None = None,
+        stream: bool | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        audio: Any = None,
+        images: Any = None,
+        videos: Any = None,
+        files: Any = None,
+        messages: Any = None,
+        stream_intermediate_steps: bool | None = None,
+        retries: int | None = None,
+        knowledge_filters: dict[str, Any] | None = None,
+    ) -> Any:
         """
         Run the orchestrator asynchronously.
-        Delegates to the underlying orchestrator's run method.
+        Delegates to the underlying orchestrator's run method or falls back to parent Agent.
         """
         try:
-            # Try to use the orchestrator's run method
-            if hasattr(self._orchestrator, 'arun'):
-                return await self._orchestrator.arun(message, stream=stream)
-            elif hasattr(self._orchestrator, 'run'):
+            # Since the orchestrator is a Team (not Agent), it doesn't have arun()
+            # Try the synchronous run method of the orchestrator first
+            if hasattr(self._orchestrator, 'run'):
+                # Team.run() has different signature, so only pass message and stream
                 return self._orchestrator.run(message, stream=stream)
             else:
-                # Fallback to parent agent run
-                return await super().arun(message, stream=stream)
+                # Fallback to parent agent arun with all parameters
+                return await super().arun(
+                    message=message,
+                    stream=stream,
+                    user_id=user_id,
+                    session_id=session_id,
+                    audio=audio,
+                    images=images,
+                    videos=videos,
+                    files=files,
+                    messages=messages,
+                    stream_intermediate_steps=stream_intermediate_steps,
+                    retries=retries,
+                    knowledge_filters=knowledge_filters,
+                )
         except Exception as e:
             # If orchestrator fails, provide a meaningful response
             error_msg = f"Orchestrator error: {str(e)}"
@@ -111,16 +138,46 @@ class OrchestratorAgentWrapper(Agent):
 
             return SimpleResponse(f"I'm having trouble coordinating the agents right now. Error: {str(e)}")
 
-    def run(self, message: str, stream: bool = False) -> Any:
+    def run(
+        self,
+        message: str | list | dict | None = None,
+        stream: bool | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        audio: Any = None,
+        images: Any = None,
+        videos: Any = None,
+        files: Any = None,
+        messages: Any = None,
+        stream_intermediate_steps: bool | None = None,
+        retries: int | None = None,
+        knowledge_filters: dict[str, Any] | None = None,
+    ) -> Any:
         """
         Run the orchestrator synchronously.
-        Delegates to the underlying orchestrator's run method.
+        Delegates to the underlying orchestrator's run method or falls back to parent Agent.
         """
         try:
+            # Try the orchestrator's run method (Team.run)
             if hasattr(self._orchestrator, 'run'):
+                # Team.run() has different signature, so only pass message and stream
                 return self._orchestrator.run(message, stream=stream)
             else:
-                return super().run(message, stream=stream)
+                # Fallback to parent agent run with all parameters
+                return super().run(
+                    message=message,
+                    stream=stream,
+                    user_id=user_id,
+                    session_id=session_id,
+                    audio=audio,
+                    images=images,
+                    videos=videos,
+                    files=files,
+                    messages=messages,
+                    stream_intermediate_steps=stream_intermediate_steps,
+                    retries=retries,
+                    knowledge_filters=knowledge_filters,
+                )
         except Exception as e:
             error_msg = f"Orchestrator error: {str(e)}"
             if self.debug_mode:
