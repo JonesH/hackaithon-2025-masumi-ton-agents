@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from agno.utils.log import logger
 
 from agents.selector import AgentType, get_agent
@@ -36,7 +36,7 @@ async def telegram_webhook(request: Request):
         
     except Exception as e:
         logger.error(f"Error handling Telegram webhook: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise
 
 
 @telegram_router.get("/status")
@@ -53,7 +53,4 @@ async def telegram_status():
         }
     except Exception as e:
         logger.error(f"Error checking Telegram agent status: {e}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        raise

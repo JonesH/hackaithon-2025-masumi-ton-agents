@@ -1,6 +1,5 @@
 from textwrap import dedent
 from typing import Optional
-import requests
 import os
 
 from agno.agent import Agent
@@ -8,8 +7,9 @@ from agno.memory.v2.db.postgres import PostgresMemoryDb
 from agno.memory.v2.memory import Memory
 from agno.models.openai import OpenAIChat
 from agno.storage.agent.postgres import PostgresAgentStorage
-from agno.tools.base import Toolkit
-from agno.utils.log import logger
+from agno.tools import Toolkit
+
+from telegram import Bot
 
 from db.session import db_url
 
@@ -31,41 +31,24 @@ class TelegramTools(Toolkit):
         Returns:
             Success/failure message
         """
-        try:
-            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-            if not bot_token:
-                return "Error: TELEGRAM_BOT_TOKEN environment variable not set"
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not bot_token:
+            raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set")
 
-            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            
-            payload = {
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "Markdown"
-            }
-            
-            if reply_to_message_id:
-                payload["reply_to_message_id"] = reply_to_message_id
-
-            response = requests.post(url, json=payload)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("ok"):
-                    message_id = result["result"]["message_id"]
-                    return f"Message sent successfully. Message ID: {message_id}"
-                else:
-                    return f"Telegram API error: {result.get('description', 'Unknown error')}"
-            else:
-                return f"HTTP error {response.status_code}: {response.text}"
-                
-        except Exception as e:
-            logger.error(f"Error sending Telegram message: {e}")
-            return f"Error sending message: {str(e)}"
+        bot = Bot(token=bot_token)
+        
+        message = bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="Markdown",
+            reply_to_message_id=reply_to_message_id
+        )
+        
+        return f"Message sent successfully. Message ID: {message.message_id}"
 
 
 def get_telegram_agent(
-    model_id: str = "gpt-4.1",
+    model_id: str = "gpt-4.1-mini",
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
     debug_mode: bool = True,
@@ -81,7 +64,7 @@ def get_telegram_agent(
         # Description of the agent
         description=dedent("""\
             You are a Telegram Assistant, an AI agent designed to interact with users through Telegram.
-            
+
             You can send messages to Telegram chats and respond to incoming messages intelligently.
         """),
         # Instructions for the agent
@@ -147,37 +130,33 @@ def get_telegram_agent(
 def handle_telegram_update(update_data: dict, agent: Agent) -> str:
     """
     Handle incoming Telegram webhook updates.
-    
+
     Args:
         update_data: The update data from Telegram webhook
         agent: The telegram agent instance
-        
+
     Returns:
         Response from the agent
     """
-    try:
-        # Extract message data
-        if "message" in update_data:
-            message = update_data["message"]
-            chat_id = str(message["chat"]["id"])
-            user_id = str(message["from"]["id"])
-            text = message.get("text", "")
-            message_id = message["message_id"]
-            
-            # Set agent session context
-            agent.user_id = user_id
-            agent.session_id = f"telegram_{chat_id}"
-            
-            # Create context for the agent
-            context = f"User sent message in Telegram chat {chat_id}: '{text}'"
-            if message.get("reply_to_message"):
-                context += f" (replying to message ID {message['reply_to_message']['message_id']})"
-            
-            # Get agent response
-            response = agent.run(context)
-            
-            return response.content if response else "No response generated"
-            
-    except Exception as e:
-        logger.error(f"Error handling Telegram update: {e}")
-        return f"Error processing message: {str(e)}"
+    # Extract message data
+    if "message" in update_data:
+        message = update_data["message"]
+        chat_id = str(message["chat"]["id"])
+        user_id = str(message["from"]["id"])
+        text = message.get("text", "")
+
+        # Set agent session context
+        agent.user_id = user_id
+        agent.session_id = f"telegram_{chat_id}"
+
+        # Create context for the agent
+        context = f"User sent message in Telegram chat {chat_id}: '{text}'"
+        if message.get("reply_to_message"):
+            context += f" (replying to message ID {message['reply_to_message']['message_id']})"
+
+        # Get agent response
+        response = agent.run(context)
+
+        return response.content if response else "No response generated"
+    
+    return "No message found in update"
