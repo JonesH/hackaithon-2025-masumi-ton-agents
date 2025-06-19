@@ -1,20 +1,46 @@
+from logging import getLogger
+
 from agno.playground import Playground
 
-from agents.agno_assist import get_agno_assist
-from agents.finance_agent import get_finance_agent
-from agents.web_agent import get_web_agent
+from agents.selector import AgentType, get_agent
+
+logger = getLogger(__name__)
 
 ######################################################
 ## Routes for the Playground Interface
 ######################################################
 
-# Get Agents to serve in the playground
-web_agent = get_web_agent(debug_mode=True)
-agno_assist = get_agno_assist(debug_mode=True)
-finance_agent = get_finance_agent(debug_mode=True)
+def get_playground_agents():
+    """Get all available agents for the playground interface."""
+    agents = []
+    
+    # Iterate through all available agent types
+    for agent_type in AgentType:
+        # Skip orchestrator as it returns a Team object, not an Agent
+        if agent_type == AgentType.ORCHESTRATOR:
+            logger.info(f"Skipping {agent_type.value} (Team object, not compatible with playground)")
+            continue
+            
+        try:
+            agent = get_agent(
+                model_id="gpt-4.1",
+                agent_id=agent_type,
+                debug_mode=True
+            )
+            agents.append(agent)
+            logger.info(f"Successfully loaded agent: {agent_type.value}")
+        except Exception as e:
+            logger.warning(f"Failed to load agent {agent_type.value}: {e}")
+            # Continue loading other agents even if one fails
+            continue
+    
+    return agents
 
-# Create a playground instance
-playground = Playground(agents=[web_agent, agno_assist, finance_agent])
+# Get all available agents for the playground
+playground_agents = get_playground_agents()
+
+# Create a playground instance with all available agents
+playground = Playground(agents=playground_agents)
 
 # Get the router for the playground
 playground_router = playground.get_async_router()

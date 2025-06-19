@@ -1,6 +1,6 @@
+import os
 from textwrap import dedent
 from typing import Optional
-import os
 
 from agno.agent import Agent
 from agno.memory.v2.db.postgres import PostgresMemoryDb
@@ -8,7 +8,6 @@ from agno.memory.v2.memory import Memory
 from agno.models.openai import OpenAIChat
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools import Toolkit
-
 from telegram import Bot
 
 from db.session import db_url
@@ -36,14 +35,11 @@ class TelegramTools(Toolkit):
             raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set")
 
         bot = Bot(token=bot_token)
-        
+
         message = bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            parse_mode="Markdown",
-            reply_to_message_id=reply_to_message_id
+            chat_id=chat_id, text=text, parse_mode="Markdown", reply_to_message_id=reply_to_message_id
         )
-        
+
         return f"Message sent successfully. Message ID: {message.message_id}"
 
 
@@ -158,5 +154,5 @@ def handle_telegram_update(update_data: dict, agent: Agent) -> str:
         response = agent.run(context)
 
         return response.content if response else "No response generated"
-    
+
     return "No message found in update"

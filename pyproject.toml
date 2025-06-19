@@ -9,6 +9,7 @@ dependencies = [
   "agno==1.4.6",
   "duckduckgo-search",
   "fastapi[standard]",
+  "httpx",
   "openai",
   "pgvector",
   "psycopg[binary]",
