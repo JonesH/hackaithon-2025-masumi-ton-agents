@@ -12,6 +12,7 @@ dependencies = [
   "openai",
   "pgvector",
   "psycopg[binary]",
+  "requests",
   "sqlalchemy",
   "yfinance",
 ]
