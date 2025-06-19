@@ -91,28 +91,35 @@ class SimpleTelegramAgent(Agent):
             tools=[SimpleTelegramTools()],
             description="Simple Telegram agent with chat_id constraint logic",
             instructions=dedent("""
-                You are a Simple Telegram Agent with the following capabilities:
+                You are a Simple Telegram Agent with context-aware capabilities:
+                
+                ## Context Awareness:
+                - **Playground Mode**: When used via playground interface, respond normally with text
+                - **Telegram Mode**: When handling telegram webhooks, use telegram tools appropriately
+                - **Explicit Mode**: Only use telegram tools when explicitly asked to send telegram messages
                 
                 ## Core Functions:
-                - Handle incoming Telegram messages
-                - Send message replies with chat_id constraints
-                - Send admin messages (admin can specify any chat_id)
+                - Handle incoming Telegram messages (when in telegram mode)
+                - Send message replies with chat_id constraints (when explicitly requested or in telegram mode)
+                - Send admin messages (when explicitly requested)
                 
-                ## Chat ID Constraint Rules:
+                ## Interaction Guidelines:
+                - **Default behavior**: Respond with normal conversational text
+                - **Use telegram tools only when**:
+                  1. User explicitly asks to "send a telegram message" or similar
+                  2. User provides specific chat_id and asks to send message
+                  3. Currently in telegram webhook mode (handling incoming telegram messages)
+                
+                ## Chat ID Constraint Rules (when using telegram tools):
                 - When replying to incoming message: MUST use incoming chat_id (cannot change)
                 - When admin initiates send: CAN specify any chat_id
                 
-                ## Message Handling:
-                - Process incoming messages and set reply context
-                - Use send_message tool for constrained replies
-                - Use admin_send_message tool for admin-initiated messages
-                - Always confirm which mode you're operating in
-                
                 ## Response Guidelines:
-                - Be helpful and conversational
-                - Format messages clearly for Telegram
-                - Handle errors gracefully
-                - Provide clear feedback on message sending status
+                - Be helpful and conversational in all contexts
+                - For playground conversations: respond with normal text
+                - For telegram operations: format messages clearly and confirm actions
+                - Handle errors gracefully and explain what went wrong
+                - Always indicate whether you're responding via text or telegram
             """),
             markdown=True,
             debug_mode=debug_mode,
@@ -120,6 +127,8 @@ class SimpleTelegramAgent(Agent):
 
         # Track current message context for chat_id constraints
         self.current_context: Optional[MessageContext] = None
+        # Track interaction mode (playground, telegram_webhook, explicit)
+        self.interaction_mode: str = "playground"
 
     def handle_incoming_message(self, update: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -136,10 +145,11 @@ class SimpleTelegramAgent(Agent):
         user_id = str(message.get("from", {}).get("id", ""))
         text = message.get("text", "")
 
-        # Set context for potential replies
+        # Set context for potential replies and telegram mode
         self.current_context = MessageContext(
             is_reply_to_incoming=True, incoming_chat_id=chat_id, admin_initiated=False
         )
+        self.interaction_mode = "telegram_webhook"
 
         result = {
             "action": "message_received",
@@ -170,22 +180,35 @@ class SimpleTelegramAgent(Agent):
 
         chat_id = self.current_context.incoming_chat_id
 
-        # Use the agent's run method to send the message
-        context_msg = f"Send a message to Telegram chat {chat_id}: '{text}'"
-        response = self.run(context_msg)
+        # Only send via telegram if in telegram mode
+        if self.interaction_mode == "telegram_webhook":
+            # Use the agent's run method to send the message
+            context_msg = f"Send a message to Telegram chat {chat_id}: '{text}'"
+            response = self.run(context_msg)
+            
+            # Clear reply context after sending
+            self.current_context = None
+            self.interaction_mode = "playground"  # Reset to default
 
-        # Clear reply context after sending
-        self.current_context = None
-
-        return {
-            "action": "reply_sent",
-            "chat_id": chat_id,
-            "text": text,
-            "mode": "reply_to_incoming",
-            "chat_id_locked": True,
-            "response": response.content if response else "No response",
-            "success": True,
-        }
+            return {
+                "action": "reply_sent",
+                "chat_id": chat_id,
+                "text": text,
+                "mode": "reply_to_incoming",
+                "chat_id_locked": True,
+                "response": response.content if response else "No response",
+                "success": True,
+            }
+        else:
+            # Just return the text without sending telegram message
+            return {
+                "action": "text_reply",
+                "text": text,
+                "mode": "text_only",
+                "chat_id_locked": False,
+                "response": text,
+                "success": True,
+            }
 
     def send_admin_message(self, chat_id: str, text: str, reply_markup: Optional[dict] = None) -> Dict[str, Any]:
         """
@@ -199,8 +222,9 @@ class SimpleTelegramAgent(Agent):
         Returns:
             Send result
         """
-        # Set admin context
+        # Set admin context and explicit mode for telegram sending
         self.current_context = MessageContext(is_reply_to_incoming=False, admin_initiated=True)
+        self.interaction_mode = "explicit"
 
         # Use the agent's run method to send the message
         context_msg = f"Send an admin message to Telegram chat {chat_id}: '{text}'"
@@ -208,6 +232,7 @@ class SimpleTelegramAgent(Agent):
 
         # Clear context after sending
         self.current_context = None
+        self.interaction_mode = "playground"  # Reset to default
 
         return {
             "action": "admin_sent",
@@ -218,6 +243,15 @@ class SimpleTelegramAgent(Agent):
             "response": response.content if response else "No response",
             "success": True,
         }
+
+    def set_interaction_mode(self, mode: str) -> None:
+        """
+        Set the interaction mode for context awareness.
+        
+        Args:
+            mode: One of 'playground', 'telegram_webhook', 'explicit'
+        """
+        self.interaction_mode = mode
 
 
 def get_simple_telegram_agent(

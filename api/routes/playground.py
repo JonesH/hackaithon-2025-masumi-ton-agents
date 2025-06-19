@@ -13,17 +13,12 @@ logger = getLogger(__name__)
 def get_playground_agents():
     """Get all available agents for the playground interface."""
     agents = []
-    
+
     # Iterate through all available agent types
     for agent_type in AgentType:
-        # Skip orchestrator as it returns a Team object, not an Agent
-        if agent_type == AgentType.ORCHESTRATOR:
-            logger.info(f"Skipping {agent_type.value} (Team object, not compatible with playground)")
-            continue
-            
         try:
             agent = get_agent(
-                model_id="gpt-4.1",
+                model_id="gpt-4.1-mini",
                 agent_id=agent_type,
                 debug_mode=True
             )
@@ -33,7 +28,7 @@ def get_playground_agents():
             logger.warning(f"Failed to load agent {agent_type.value}: {e}")
             # Continue loading other agents even if one fails
             continue
-    
+
     return agents
 
 # Get all available agents for the playground

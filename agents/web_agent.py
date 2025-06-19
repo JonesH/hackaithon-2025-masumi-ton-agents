@@ -12,7 +12,7 @@ from db.session import db_url
 
 
 def get_web_agent(
-    model_id: str = "gpt-4.1",
+    model_id: str = "gpt-4.1-mini",
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
     debug_mode: bool = True,

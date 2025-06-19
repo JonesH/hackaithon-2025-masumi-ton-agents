@@ -5,6 +5,7 @@ from agents.agno_assist import get_agno_assist
 from agents.finance_agent import get_finance_agent
 from agents.masumi_agent import get_masumi_agent
 from agents.orchestrator import get_agent_orchestrator
+from agents.orchestrator_wrapper import get_orchestrator_wrapper
 from agents.simple_telegram_agent import get_simple_telegram_agent
 from agents.telegram_agent import get_telegram_agent
 from agents.telegram_mcp_agent import get_telegram_mcp_agent
@@ -28,7 +29,7 @@ def get_available_agents() -> List[str]:
 
 
 def get_agent(
-    model_id: str = "gpt-4.1",
+    model_id: str = "gpt-4.1-mini",
     agent_id: Optional[AgentType] = None,
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
@@ -51,6 +52,6 @@ def get_agent(
     elif agent_id == AgentType.TELEGRAM_MCP_AGENT:
         return get_telegram_mcp_agent(model_id=model_id, user_id=user_id, session_id=session_id, debug_mode=debug_mode)
     elif agent_id == AgentType.ORCHESTRATOR:
-        return get_agent_orchestrator(model_id=model_id)
+        return get_orchestrator_wrapper(model_id=model_id, user_id=user_id, session_id=session_id, debug_mode=debug_mode)
 
     raise ValueError(f"Agent: {agent_id} not found")
